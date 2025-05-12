@@ -7,15 +7,18 @@ import groovy.util.logging.Slf4j
 import io.micronaut.function.aws.proxy.MockLambdaContext
 import io.micronaut.function.aws.proxy.payload1.ApiGatewayProxyRequestEventFunction
 import io.micronaut.http.HttpMethod
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 @Slf4j
+@MicronautTest(environments = "ec2")
 class LambdaControllerSpec extends Specification {
   static def jsonParser = new JsonSlurper()
 
   static {
+    System.setProperty("micronaut.environments", "ec2,test")
     System.setProperty("aws.region", "us-east-1")
     System.setProperty("aws.endpointUrl", "http://localhost:4566")
   }
@@ -44,6 +47,22 @@ class LambdaControllerSpec extends Specification {
     then:
     response.statusCode == 200
     body.size() > 10
+
+    when:
+    def awsSsmVars = [
+        'a', 'b', 'c', 'd', 'foo.bar'
+    ]
+
+    then:
+    // make sure that stuff gets pulled in from aws ssm
+    awsSsmVars.each {
+      assert body[it].isEmpty() == false
+      assert body[it].contains("-val-")
+    }
+
+    // make sure that app config gets something from aws ssm
+    !body['app.foo'].isBlank()
+    body['app.foo']== body['foo.bar']
   }
 
   def "ssm handler"() {

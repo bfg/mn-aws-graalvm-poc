@@ -54,6 +54,9 @@ sdk use java 24.0.1-graal
 
 * run native image
 ```
+export AWS_ENDPOINT_URL=http://localhost:4566
+export AWS_REGION=us-east-1
+
 ./build/native/nativeCompile/aws-graalvm --help
 ./build/native/nativeCompile/aws-graalvm ssm /my-app
 ```

@@ -1,0 +1,191 @@
+//
+// build.gradle
+//
+
+plugins {
+  id  "groovy"
+
+  id  "com.gradleup.shadow"         version "8.3.6"
+  id  "com.fizzpod.sweeney"         version "6.0.4"
+  id  "com.google.osdetector"       version "1.7.3"
+
+  id  "io.micronaut.application"    version "4.5.3"
+  //id  "io.micronaut.aot"            version "4.5.3"
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+configurations {
+  // we don't want commons-logging on the classpath, we want to use slf4j-jcl
+  // to forward commons-logging to slf4j
+  all*.exclude group: "commons-logging"
+}
+
+dependencies {
+  annotationProcessor("io.micronaut:micronaut-http-validation")
+  annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
+  annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+
+  compileOnly("org.projectlombok:lombok:${lombokVersion}")
+
+  // BEGIN: micronaut
+  implementation("io.micronaut.aws:micronaut-aws-lambda-events-serde")
+  //implementation("io.micronaut.crac:micronaut-crac")
+  implementation("io.micronaut.picocli:micronaut-picocli")
+  implementation("io.micronaut.serde:micronaut-serde-jackson")
+
+  implementation("io.micronaut.serde:micronaut-serde-jackson")
+
+  // micronaut-aws
+  implementation("io.micronaut.aws:micronaut-aws-sdk-v2")
+  implementation("io.micronaut.aws:micronaut-aws-parameter-store")
+
+  // micronaut-functions
+  implementation("io.micronaut.aws:micronaut-function-aws")
+  implementation("io.micronaut.aws:micronaut-function-aws-custom-runtime")
+
+  compileOnly("io.micronaut:micronaut-http-client-jdk")
+
+  testImplementation("io.micronaut:micronaut-function")
+  testImplementation("io.micronaut:micronaut-http-client-jdk")
+  testImplementation("org.apache.groovy:groovy-json")
+  // END: micronaut
+
+  implementation("io.micronaut.kotlin:micronaut-kotlin-runtime")
+
+  // BEGIN: AWS SDK
+  implementation("software.amazon.awssdk:s3:${awsSdkVersion}")
+  implementation("software.amazon.awssdk:ssm:${awsSdkVersion}")
+  //implementation("software.amazon.awssdk:secretsmanager:${awsSdkVersion}")
+  implementation("org.slf4j:jcl-over-slf4j")
+  // END:   AWS SDK
+
+  runtimeOnly("ch.qos.logback:logback-classic")
+}
+
+java {
+  sourceCompatibility = JavaVersion.toVersion("24")
+  targetCompatibility = JavaVersion.toVersion("24")
+}
+
+micronaut {
+  runtime("lambda_java")
+  testRuntime("spock2")
+  processing {
+    incremental(true)
+    annotations("com.github.bfg.awsgraalvm.*")
+  }
+
+  nativeLambda {
+    lambdaRuntimeClassName = "io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRuntime"
+  }
+
+  /*
+  aot {
+      // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/
+      optimizeServiceLoading = false
+      convertYamlToJava = false
+      precomputeOperations = true
+      cacheEnvironment = true
+      optimizeClassLoading = true
+      deduceEnvironment = true
+      optimizeNetty = true
+      replaceLogbackXml = true
+  }
+   */
+}
+
+graalvmNative {
+  toolchainDetection = false
+  binaries {
+    main {
+      imageName     = "aws-graalvm"
+      fallback      = false
+      richOutput    = true
+
+      buildArgs.addAll([
+          '-H:+UnlockExperimentalVMOptions',
+          //'-H:+IncludeAllLocales',
+      ])
+
+      // optimize for faster build time by default
+      if (envBool('NATIVE_OPTIMIZE_FOR_PERFORMANCE')) {
+        buildArgs.add("-O2")
+      } else {
+        buildArgs.add("-Ob")
+      }
+
+      // enable native-image monitoring
+      //buildArgs.add("--enable-monitoring=all")
+
+      // linux specifics/optimizations
+      if (osdetector.os == 'linux') {
+        // everybody likes statically linked binaries
+        // NOTE: native-image doesn't really produce truly statically linked binaries on glibc systems,
+        //       and to make matters even worse, produced statically linked binaries tend to crash
+        //       on systems with different glibc versions, yup, rly :-/
+        //       additionally, build fails on ubuntu 24 when --static is used in combination with -O3
+        //buildArgs.add("--static")
+
+        // The G1 garbage collector ('--gc=G1') is currently only supported on AMD64 and AArch64.
+        if (osdetector.arch in ['x86_64', 'aarch64']) {
+          buildArgs.add("--gc=G1")
+          // graalvm-enterprise
+          //buildArgs.add("-XX:MaximumHeapSizePercent=85")
+        }
+      }
+    }
+  }
+}
+
+tasks.named("dockerfileNative") {
+  jdkVersion = "24"
+  args(
+      "-XX:MaximumHeapSizePercent=80",
+      "-Dio.netty.allocator.numDirectArenas=0",
+      "-Dio.netty.noPreferDirect=true"
+  )
+}
+
+// require JDK 11+ for build
+sweeney {
+  enforce "gradle:[8.14,)"   // require gradle >= 8.14
+  enforce "jdk:[24,)"        // require JDK24+
+}
+
+application {
+  mainClass = "com.github.bfg.awsgraalvm.Application"
+}
+
+run {
+  // specify default micronaut environments if MICRONAUT_ENVIRONMENTS env is not set
+  def mnEnv = System.env['MICRONAUT_ENVIRONMENTS']?.trim()
+  if (mnEnv == null) {
+    // default micronaut environments
+    def defaultEnvs = "dev,local"
+
+    // additional micronaut environments to be appended to the default ones
+    def additionalEnvs = System.env['MN_ENVS']?.trim() ?: ""
+
+    // add additional environments if specified
+    def envs = (additionalEnvs) ? "${defaultEnvs},${additionalEnvs}" : defaultEnvs
+    systemProperty("micronaut.environments", envs)
+  }
+}
+
+static def envBool(def key, def defaultValue = false) {
+  def value = System.env[key]
+  if (value == null) {
+    value = defaultValue.toString()
+  }
+
+  return (value in ['1', 't', 'true', 'y', 'yes', 'on'])
+}
+
+// vim:shiftwidth=2 softtabstop=2 expandtab
+// EOF
+
+

@@ -1,0 +1,7 @@
+[versions]
+managed-spock = "2.4-M6-groovy-4.0"
+
+
+[libraries]
+boms-spock = { module = "org.spockframework:spock-bom", version.ref = "managed-spock" }
+spock-core = { module = "org.spockframework:spock-core" }

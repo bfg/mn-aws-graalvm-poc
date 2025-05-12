@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: com.github.bfg.awsgraalvm
+testFramework: spock
+sourceLanguage: java
+buildTool: gradle
+features: [ app-name, aws-lambda, aws-lambda-events-serde, aws-lambda-handler-default, gradle, http-client-test, java, java-application, logback, micronaut-aot, micronaut-build, micronaut-http-validation, properties, readme, serialization-jackson, shade, snapstart, spock, static-resources, x86 ]

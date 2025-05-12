@@ -1,0 +1,28 @@
+#
+# docker-compose.yml
+#
+
+# reference: https://docs.docker.com/compose/compose-file/
+
+name:     "aws-graalvm"
+
+services:
+  localstack:
+    image:          localstack/localstack:4.4.0
+    mem_limit:      1G
+    #user:           "1026:100"
+    ports:
+      - 4566:4566
+    volumes:
+      #- "${LOCALSTACK_VOLUME_DIR:-./data/localstack}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
+      SERVICES:               "events,ssm,secretsmanager"
+      DEBUG:                  ${DEBUG:-0}
+      EAGER_SERVICE_LOADING:  1
+      PERSISTENCE:            1
+
+# vim:syntax=yaml shiftwidth=2 softtabstop=2 expandtab
+# EOF
+

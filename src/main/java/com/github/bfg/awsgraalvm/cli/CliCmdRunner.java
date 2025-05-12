@@ -12,6 +12,7 @@ import picocli.CommandLine.Command;
     name = "aws-graalvm", description = {"aws command command runner\n"},
     subcommands = {
         SsmCmd.class,
+        ConfigCmd.class,
     })
 @ReflectiveAccess
 public class CliCmdRunner extends BaseCmd {

@@ -72,7 +72,8 @@ java {
 }
 
 micronaut {
-  runtime("lambda_java")
+  //runtime("lambda_java")
+  runtime("lambda_provided")
   testRuntime("spock2")
   processing {
     incremental(true)
@@ -80,7 +81,7 @@ micronaut {
   }
 
   nativeLambda {
-    lambdaRuntimeClassName = "io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRuntime"
+    lambdaRuntimeClassName = "io.micronaut.function.aws.runtime.MicronautLambdaRuntime"
   }
 
   /*
@@ -142,6 +143,7 @@ graalvmNative {
 }
 
 tasks.named("dockerfileNative") {
+  baseImage = "amazonlinux:2023"
   jdkVersion = "24"
   args(
       "-XX:MaximumHeapSizePercent=80",
@@ -174,6 +176,19 @@ run {
     def envs = (additionalEnvs) ? "${defaultEnvs},${additionalEnvs}" : defaultEnvs
     systemProperty("micronaut.environments", envs)
   }
+}
+
+// application/shadowJar plugins: disable creation of distribution archives
+distZip.enabled = distTar.enabled = false
+shadowJar {
+  // enable shadowJar task only if it's explicitly requested via cli by containing "shadowJar" in the task list
+  onlyIf {
+    gradle.startParameter.taskRequests.find {
+      it.args.find { it.contains("shadowJar") } != null
+    } != null
+  }
+
+  mergeServiceFiles()
 }
 
 static def envBool(def key, def defaultValue = false) {

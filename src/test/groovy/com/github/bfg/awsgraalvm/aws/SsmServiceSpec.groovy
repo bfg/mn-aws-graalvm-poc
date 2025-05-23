@@ -21,6 +21,12 @@ class SsmServiceSpec extends Specification {
   @Shared
   String appName
 
+  static {
+    System.setProperty("micronaut.environments", "ec2,test")
+    System.setProperty("aws.region", "us-east-1")
+    System.setProperty("aws.endpointUrl", "http://localhost:4566")
+  }
+
   def "should contain correct app name"() {
     def appName = env.getProperty("micronaut.application.name", String).get()
 

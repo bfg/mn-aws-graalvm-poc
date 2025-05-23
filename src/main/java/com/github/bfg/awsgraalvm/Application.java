@@ -1,8 +1,10 @@
 package com.github.bfg.awsgraalvm;
 
 import com.github.bfg.awsgraalvm.cli.CliCmdRunner;
+import io.micronaut.function.aws.runtime.MicronautLambdaRuntime;
 import io.micronaut.runtime.Micronaut;
 import jakarta.inject.Singleton;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
@@ -17,14 +19,14 @@ import java.util.stream.Stream;
 public class Application {
   public static final long STARTED_AT = System.currentTimeMillis();
 
+  @SneakyThrows
   public static void main(String... args) {
     // PicoCliRunner.run/call and Micronaut.run() don't play well together,
     // so we need to decide which one to use based on the cli arguments
     if (shouldInvokeCliApp(Arrays.asList(args))) {
       CliCmdRunner.main(args);
     } else if (shouldInvokeFunction()) {
-      log.info("we should invoke lambda function!");
-      // TODO: add support for AWS Lambda
+      MicronautLambdaRuntime.main(args);
     } else {
       // remove `run` from the args
       val filteredArgs = Stream.of(args)
